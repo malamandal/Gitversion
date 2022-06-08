@@ -1,5 +1,6 @@
 trigger:
   - develop
+  - release
   
 pr: none  
 

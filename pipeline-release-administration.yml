@@ -2,6 +2,7 @@ trigger:
   - develop
   - release
   - release_v1.1
+  - release_v1.2
   
 pr: none  
 

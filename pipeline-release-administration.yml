@@ -1,6 +1,7 @@
 trigger:
   - develop
   - release
+  - release_v1.1
   
 pr: none  
 
@@ -53,16 +54,9 @@ jobs:
             git push --tags
             Write-Host "Done." -ForegroundColor Cyan
 
-  ## Job to create release notes file and publish it to the wiki
-  - job: CreateReleaseNotes
-    displayName: Creating release notes
-    dependsOn: CalculateVersion
-    condition: contains(variables['Build.SourceBranch'], 'release_v')
-
-    steps:
-      # Generates a release notes file
       - task: XplatGenerateReleaseNotes@3
         displayName: "Generate release notes"
+        condition: contains(variables['Build.SourceBranch'], 'release_v')
         inputs:
           outputfile: '/home/vsts/work/1/s/releasenotes.md'
           templateLocation: File
@@ -78,7 +72,19 @@ jobs:
 
 
       - task: PublishBuildArtifacts@1
+        condition: contains(variables['Build.SourceBranch'], 'release_v')
         inputs:
           PathtoPublish: '/home/vsts/work/1/s/releasenotes.md'
           ArtifactName: 'ReleaseNotes'
           publishLocation: 'Container'
+          
+      - task: UniversalPackages@0
+        condition: contains(variables['Build.SourceBranch'], 'release_v')
+        inputs:
+          command: 'publish'
+          publishDirectory: '/home/vsts/work/1/s/releasenotes.md'
+          feedsToUsePublish: 'internal'
+          vstsFeedPublish: 'f3ca8ee4-f43a-431b-9416-28cd53395877/24638104-c6a7-4ea0-957b-b8c4d2916c6d'
+          vstsFeedPackagePublish: 'di'
+          versionOption: 'custom'
+          versionPublish: '$(GitVersion.SemVer)'

@@ -54,14 +54,6 @@ jobs:
             git push --tags
             Write-Host "Done." -ForegroundColor Cyan
 
-  ## Job to create release notes file and publish it to the wiki
-  - job: CreateReleaseNotes
-    displayName: Creating release notes
-    dependsOn: CalculateVersion
-    condition: contains(variables['Build.SourceBranch'], 'release_v')
-
-    steps:
-      # Generates a release notes file
       - task: XplatGenerateReleaseNotes@3
         displayName: "Generate release notes"
         inputs:

@@ -1,0 +1,85 @@
+trigger:
+  - main
+  - master
+  - develop
+  
+pr: none  
+
+pool:
+  vmImage: ubuntu-latest
+  
+variables:
+  system_accesstoken: $(System.AccessToken)
+
+## Job to create release and add tag
+jobs:
+  - job: CalculateVersion
+    displayName: Tagging release version
+
+    steps:
+      # Checkout with persist credentials
+      - checkout: self
+        persistCredentials: true
+
+      # Install GitVersion
+      - task: gitversion/setup@0
+        displayName: Install GitVersion
+        inputs:
+          versionSpec: "5.x"
+
+      # Determine the semantic version
+      - task: gitversion/execute@0
+        displayName: Calculating version
+        inputs:
+          useConfigFile: True
+          configFilePath: ".github/gitversion.yml"
+
+      # Update Build.BuildNumber to use SemVer, as by default it uses FullSemVer
+      - pwsh: |
+          Write-Host "##vso[build.updatebuildnumber]$(GitVersion.SemVer)"
+        displayName: Update Build.BuildNumber
+      # Adds the tag for the calculated semantic version
+      - task: PowerShell@2
+        displayName: Adding git release tag for databricks
+        condition: contains(variables['Build.SourceBranch'], 'release_v')
+        inputs:
+          targetType: inline
+          script: |
+            Write-Host "Configuring git author info.." -ForegroundColor Cyan
+            git config user.email "Azure DevOps pipeline"
+            git config user.name "Azure.Devops@pipeline.com"
+            Write-Host "Adding git tag for release DI-$(GitVersion.SemVer).." -ForegroundColor Cyan
+            git tag -a $("DI-v$(GitVersion.SemVer)") -m $("Release DI-$(GitVersion.SemVer)")
+            Write-Host "Doing git push.." -ForegroundColor Cyan
+            git push --tags
+            Write-Host "Done." -ForegroundColor Cyan
+
+  ## Job to create release notes file and publish it to the wiki
+  - job: CreateReleaseNotes
+    displayName: Creating release notes
+    dependsOn: CalculateVersion
+    condition: contains(variables['Build.SourceBranch'], 'release_v')
+
+    steps:
+      # Generates a release notes file
+      - task: XplatGenerateReleaseNotes@3
+        displayName: "Generate release notes"
+        inputs:
+          outputfile: '/home/vsts/work/1/s/releasenotes.md'
+          templateLocation: File
+          templatefile: ".github/release-notes-template.md"
+          dumpPayloadToConsole: false
+          dumpPayloadToFile: false
+          replaceFile: True
+          getParentsAndChildren: False
+          getAllParents: False
+          getIndirectPullRequests: False
+          stopOnError: True
+          considerPartiallySuccessfulReleases: False
+
+
+      - task: PublishBuildArtifacts@1
+        inputs:
+          PathtoPublish: '/home/vsts/work/1/s/releasenotes.md'
+          ArtifactName: 'ReleaseNotes'
+          publishLocation: 'Container'
